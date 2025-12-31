@@ -63,3 +63,80 @@ impl IntoResponse for ApiError {
 
 /// Result type alias for API operations
 pub type Result<T> = std::result::Result<T, ApiError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_unauthorized_status() {
+        let error = ApiError::Unauthorized("invalid token".to_string());
+        let response = error.into_response();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn test_not_found_status() {
+        let error = ApiError::NotFound("card 123".to_string());
+        let response = error.into_response();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn test_bad_request_status() {
+        let error = ApiError::BadRequest("invalid input".to_string());
+        let response = error.into_response();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_parse_error_status() {
+        let error = ApiError::Parse("invalid ID".to_string());
+        let response = error.into_response();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_internal_error_status() {
+        let error = ApiError::Internal("unexpected error".to_string());
+        let response = error.into_response();
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn test_migration_error_status() {
+        let error = ApiError::Migration("migration failed".to_string());
+        let response = error.into_response();
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn test_error_display_unauthorized() {
+        let error = ApiError::Unauthorized("invalid token".to_string());
+        assert_eq!(error.to_string(), "Unauthorized: invalid token");
+    }
+
+    #[test]
+    fn test_error_display_not_found() {
+        let error = ApiError::NotFound("Card 123".to_string());
+        assert_eq!(error.to_string(), "Not found: Card 123");
+    }
+
+    #[test]
+    fn test_error_display_bad_request() {
+        let error = ApiError::BadRequest("missing field".to_string());
+        assert_eq!(error.to_string(), "Bad request: missing field");
+    }
+
+    #[test]
+    fn test_error_display_parse() {
+        let error = ApiError::Parse("invalid number".to_string());
+        assert_eq!(error.to_string(), "Parse error: invalid number");
+    }
+
+    #[test]
+    fn test_error_display_internal() {
+        let error = ApiError::Internal("connection lost".to_string());
+        assert_eq!(error.to_string(), "Internal error: connection lost");
+    }
+}

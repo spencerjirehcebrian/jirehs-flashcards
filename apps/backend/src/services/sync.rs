@@ -282,4 +282,154 @@ A: 1. Each value has one owner
         assert_eq!(extract_deck_path("prog/rust/basics.md"), "prog/rust");
         assert_eq!(extract_deck_path("single.md"), "");
     }
+
+    // === Additional parse tests ===
+
+    #[test]
+    fn test_parse_multiple_cards() {
+        let content = r#"ID: 1
+Q: First question?
+A: First answer.
+
+ID: 2
+Q: Second question?
+A: Second answer."#;
+
+        let result = parse_md_content(content).unwrap();
+        assert_eq!(result.cards.len(), 2);
+        assert_eq!(result.cards[0].id, Some(1));
+        assert_eq!(result.cards[0].question, "First question?");
+        assert_eq!(result.cards[1].id, Some(2));
+        assert_eq!(result.cards[1].question, "Second question?");
+    }
+
+    #[test]
+    fn test_parse_card_with_empty_id() {
+        let content = r#"ID:
+Q: Question?
+A: Answer."#;
+
+        let result = parse_md_content(content).unwrap();
+        assert_eq!(result.cards.len(), 1);
+        assert_eq!(result.cards[0].id, None);
+    }
+
+    #[test]
+    fn test_parse_invalid_id_returns_error() {
+        let content = r#"ID: not_a_number
+Q: Question?
+A: Answer."#;
+
+        let result = parse_md_content(content);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_card_missing_answer() {
+        let content = r#"ID: 1
+Q: Question without answer"#;
+
+        let result = parse_md_content(content).unwrap();
+        assert_eq!(result.cards.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_card_missing_question() {
+        let content = r#"ID: 1
+A: Answer without question"#;
+
+        let result = parse_md_content(content).unwrap();
+        assert_eq!(result.cards.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_empty_content() {
+        let result = parse_md_content("").unwrap();
+        assert_eq!(result.cards.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_content_with_only_whitespace() {
+        let result = parse_md_content("   \n\n   \t  ").unwrap();
+        assert_eq!(result.cards.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_cards_without_ids_multiple() {
+        // Multiple cards without IDs - each needs an empty ID line to delimit
+        // This matches the expected file format where ID: line starts each card
+        let content = "ID:\nQ: First?\nA: First.\n\nID:\nQ: Second?\nA: Second.";
+
+        let result = parse_md_content(content).unwrap();
+        assert_eq!(result.cards.len(), 2);
+        assert_eq!(result.cards[0].id, None);
+        assert_eq!(result.cards[0].line, 1);
+        assert_eq!(result.cards[1].id, None);
+        assert_eq!(result.cards[1].line, 5);
+    }
+
+    // === Additional regenerate tests ===
+
+    #[test]
+    fn test_regenerate_preserves_original_when_no_ids() {
+        let content = "ID: 1\nQ: Question?\nA: Answer.";
+        let result = regenerate_md_with_ids(content, &[]);
+        assert_eq!(result, content);
+    }
+
+    #[test]
+    fn test_regenerate_multiple_ids() {
+        let content = "Q: First?\nA: First.\n\nQ: Second?\nA: Second.";
+        let new_ids = vec![
+            NewIdAssignment {
+                path: "test.md".to_string(),
+                line: 1,
+                id: 100,
+            },
+            NewIdAssignment {
+                path: "test.md".to_string(),
+                line: 4,
+                id: 101,
+            },
+        ];
+
+        let result = regenerate_md_with_ids(content, &new_ids);
+        assert!(result.contains("ID: 100\nQ: First?"));
+        assert!(result.contains("ID: 101\nQ: Second?"));
+    }
+
+    // === Additional hash tests ===
+
+    #[test]
+    fn test_hash_deterministic() {
+        let content = "test content";
+        let hash1 = hash_content(content);
+        let hash2 = hash_content(content);
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_hash_different_content() {
+        let hash1 = hash_content("content 1");
+        let hash2 = hash_content("content 2");
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_hash_empty_string() {
+        let hash = hash_content("");
+        assert_eq!(hash.len(), 64);
+    }
+
+    // === Additional extract_deck_path tests ===
+
+    #[test]
+    fn test_extract_deck_path_nested() {
+        assert_eq!(extract_deck_path("a/b/c/d.md"), "a/b/c");
+    }
+
+    #[test]
+    fn test_extract_deck_path_with_spaces() {
+        assert_eq!(extract_deck_path("my decks/rust/basics.md"), "my decks/rust");
+    }
 }

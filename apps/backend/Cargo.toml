@@ -24,3 +24,8 @@ aws-config = "1"
 aws-sdk-s3 = "1"
 dotenvy = "0.15"
 sha2 = "0.10"
+
+[dev-dependencies]
+axum-test = "16"
+tokio-test = "0.4"
+pretty_assertions = "1"

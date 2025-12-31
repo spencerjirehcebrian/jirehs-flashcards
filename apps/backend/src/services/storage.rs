@@ -220,3 +220,47 @@ impl StorageService {
         format!("{}/{}", device_id, file_path.trim_start_matches('/'))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_make_key_basic() {
+        let key = StorageService::make_key("device-123", "path/to/file.md");
+        assert_eq!(key, "device-123/path/to/file.md");
+    }
+
+    #[test]
+    fn test_make_key_strips_leading_slash() {
+        let key = StorageService::make_key("device-123", "/path/to/file.md");
+        assert_eq!(key, "device-123/path/to/file.md");
+    }
+
+    #[test]
+    fn test_make_key_multiple_leading_slashes() {
+        let key = StorageService::make_key("device-123", "///path/file.md");
+        assert_eq!(key, "device-123/path/file.md");
+    }
+
+    #[test]
+    fn test_make_key_empty_path() {
+        let key = StorageService::make_key("device-123", "");
+        assert_eq!(key, "device-123/");
+    }
+
+    #[test]
+    fn test_make_key_uuid_device_id() {
+        let device_id = "550e8400-e29b-41d4-a716-446655440000";
+        let key = StorageService::make_key(device_id, "deck/cards.md");
+        assert!(key.starts_with(device_id));
+        assert!(key.ends_with("deck/cards.md"));
+        assert_eq!(key, "550e8400-e29b-41d4-a716-446655440000/deck/cards.md");
+    }
+
+    #[test]
+    fn test_make_key_preserves_internal_slashes() {
+        let key = StorageService::make_key("dev", "a/b/c/d/e.md");
+        assert_eq!(key, "dev/a/b/c/d/e.md");
+    }
+}

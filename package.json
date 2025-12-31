@@ -5,8 +5,11 @@
   "scripts": {
     "dev": "nx run-many -t dev",
     "build": "nx run-many -t build",
+    "test": "nx run-many -t test",
     "frontend:dev": "nx run frontend:dev",
     "frontend:build": "nx run frontend:build",
+    "frontend:test": "nx run frontend:test",
+    "frontend:test:coverage": "nx run frontend:test:coverage",
     "desktop:dev": "nx run desktop:dev",
     "desktop:build": "nx run desktop:build"
   },

@@ -524,3 +524,322 @@ pub struct UpdateDeckSettingsRequest {
     pub new_cards_per_day: Option<i32>,
     pub reviews_per_day: Option<i32>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // === DbCard tests ===
+
+    #[test]
+    fn test_db_card_to_api_card() {
+        let db_card = DbCard {
+            id: 42,
+            device_id: Uuid::new_v4(),
+            deck_path: "rust/basics".to_string(),
+            question_text: "What is Rust?".to_string(),
+            answer_text: "A systems language.".to_string(),
+            question_hash: "abc123".to_string(),
+            answer_hash: "def456".to_string(),
+            source_file: "rust/basics.md".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            deleted_at: None,
+        };
+
+        let api_card = db_card.to_api_card();
+
+        assert_eq!(api_card.id, 42);
+        assert_eq!(api_card.deck_path, "rust/basics");
+        assert_eq!(api_card.question, "What is Rust?");
+        assert_eq!(api_card.answer, "A systems language.");
+        assert_eq!(api_card.source_file, "rust/basics.md");
+        assert!(api_card.deleted_at.is_none());
+    }
+
+    #[test]
+    fn test_db_card_to_api_card_with_deleted_at() {
+        let deleted_time = Utc::now();
+        let db_card = DbCard {
+            id: 1,
+            device_id: Uuid::new_v4(),
+            deck_path: "test".to_string(),
+            question_text: "Q".to_string(),
+            answer_text: "A".to_string(),
+            question_hash: "hash".to_string(),
+            answer_hash: "hash".to_string(),
+            source_file: "test.md".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            deleted_at: Some(deleted_time),
+        };
+
+        let api_card = db_card.to_api_card();
+        assert!(api_card.deleted_at.is_some());
+    }
+
+    // === DbCardState tests ===
+
+    #[test]
+    fn test_db_card_state_from_core_state_new() {
+        let core_state = CardState {
+            status: CardStatus::New,
+            interval_days: 0.0,
+            ease_factor: 2.5,
+            stability: None,
+            difficulty: None,
+            lapses: 0,
+            reviews_count: 0,
+            due_date: None,
+        };
+
+        let device_id = Uuid::new_v4();
+        let db_state = DbCardState::from_core_state(42, device_id, &core_state);
+
+        assert_eq!(db_state.card_id, 42);
+        assert_eq!(db_state.device_id, device_id);
+        assert_eq!(db_state.status, "new");
+        assert_eq!(db_state.interval_days, 0.0);
+        assert_eq!(db_state.ease_factor, 2.5);
+        assert!(db_state.due_date.is_none());
+    }
+
+    #[test]
+    fn test_db_card_state_from_core_state_learning() {
+        let core_state = CardState {
+            status: CardStatus::Learning,
+            interval_days: 0.5,
+            ease_factor: 2.3,
+            stability: Some(1.5),
+            difficulty: Some(0.5),
+            lapses: 1,
+            reviews_count: 3,
+            due_date: Some(Utc::now()),
+        };
+
+        let db_state = DbCardState::from_core_state(1, Uuid::new_v4(), &core_state);
+
+        assert_eq!(db_state.status, "learning");
+        assert_eq!(db_state.stability, Some(1.5));
+        assert_eq!(db_state.difficulty, Some(0.5));
+        assert_eq!(db_state.lapses, 1);
+        assert_eq!(db_state.reviews_count, 3);
+    }
+
+    #[test]
+    fn test_db_card_state_to_core_state_roundtrip() {
+        let original = CardState {
+            status: CardStatus::Review,
+            interval_days: 10.0,
+            ease_factor: 2.8,
+            stability: Some(15.0),
+            difficulty: Some(0.3),
+            lapses: 2,
+            reviews_count: 20,
+            due_date: None,
+        };
+
+        let db_state = DbCardState::from_core_state(1, Uuid::new_v4(), &original);
+        let roundtrip = db_state.to_core_state();
+
+        assert_eq!(roundtrip.status, CardStatus::Review);
+        assert_eq!(roundtrip.interval_days, 10.0);
+        assert_eq!(roundtrip.ease_factor, 2.8);
+        assert_eq!(roundtrip.stability, Some(15.0));
+        assert_eq!(roundtrip.lapses, 2);
+        assert_eq!(roundtrip.reviews_count, 20);
+    }
+
+    #[test]
+    fn test_db_card_state_status_parsing() {
+        let cases = [
+            ("new", CardStatus::New),
+            ("learning", CardStatus::Learning),
+            ("review", CardStatus::Review),
+            ("relearning", CardStatus::Relearning),
+            ("unknown", CardStatus::New),
+            ("", CardStatus::New),
+        ];
+
+        for (status_str, expected) in cases {
+            let db_state = DbCardState {
+                status: status_str.to_string(),
+                ..Default::default()
+            };
+            assert_eq!(db_state.to_core_state().status, expected);
+        }
+    }
+
+    #[test]
+    fn test_db_card_state_with_id() {
+        let db_state = DbCardState {
+            card_id: 123,
+            ..Default::default()
+        };
+        let with_id = db_state.to_core_state_with_id();
+        assert_eq!(with_id.card_id, 123);
+    }
+
+    // === DbGlobalSettings tests ===
+
+    #[test]
+    fn test_db_global_settings_default() {
+        let device_id = Uuid::new_v4();
+        let settings = DbGlobalSettings::default_for_device(device_id);
+
+        assert_eq!(settings.device_id, device_id);
+        assert_eq!(settings.algorithm, "sm2");
+        assert_eq!(settings.rating_scale, "4point");
+        assert_eq!(settings.matching_mode, "fuzzy");
+        assert_eq!(settings.fuzzy_threshold, 0.8);
+        assert_eq!(settings.new_cards_per_day, 20);
+        assert_eq!(settings.reviews_per_day, 200);
+        assert_eq!(settings.daily_reset_hour, 0);
+    }
+
+    #[test]
+    fn test_db_global_settings_to_api() {
+        let settings = DbGlobalSettings {
+            device_id: Uuid::new_v4(),
+            algorithm: "fsrs".to_string(),
+            rating_scale: "2point".to_string(),
+            matching_mode: "exact".to_string(),
+            fuzzy_threshold: 0.9,
+            new_cards_per_day: 30,
+            reviews_per_day: 150,
+            daily_reset_hour: 4,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let api = settings.to_api_settings();
+
+        assert_eq!(api.algorithm, Algorithm::Fsrs);
+        assert_eq!(api.rating_scale, RatingScale::TwoPoint);
+        assert_eq!(api.matching_mode, MatchingMode::Exact);
+        assert_eq!(api.fuzzy_threshold, 0.9);
+        assert_eq!(api.new_cards_per_day, 30);
+    }
+
+    #[test]
+    fn test_db_global_settings_matching_mode_case_insensitive() {
+        let settings = DbGlobalSettings {
+            matching_mode: "case_insensitive".to_string(),
+            ..DbGlobalSettings::default_for_device(Uuid::new_v4())
+        };
+        assert_eq!(
+            settings.to_api_settings().matching_mode,
+            MatchingMode::CaseInsensitive
+        );
+    }
+
+    // === DbDeckSettings tests ===
+
+    #[test]
+    fn test_db_deck_settings_to_api_all_none() {
+        let settings = DbDeckSettings {
+            id: Uuid::new_v4(),
+            device_id: Uuid::new_v4(),
+            deck_path: "test/deck".to_string(),
+            algorithm: None,
+            rating_scale: None,
+            matching_mode: None,
+            fuzzy_threshold: None,
+            new_cards_per_day: None,
+            reviews_per_day: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let api = settings.to_api_settings();
+
+        assert_eq!(api.deck_path, "test/deck");
+        assert!(api.algorithm.is_none());
+        assert!(api.rating_scale.is_none());
+    }
+
+    #[test]
+    fn test_db_deck_settings_to_api_with_overrides() {
+        let settings = DbDeckSettings {
+            id: Uuid::new_v4(),
+            device_id: Uuid::new_v4(),
+            deck_path: "test".to_string(),
+            algorithm: Some("fsrs".to_string()),
+            rating_scale: Some("2point".to_string()),
+            matching_mode: Some("exact".to_string()),
+            fuzzy_threshold: Some(0.95),
+            new_cards_per_day: Some(50),
+            reviews_per_day: Some(100),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let api = settings.to_api_settings();
+
+        assert_eq!(api.algorithm, Some(Algorithm::Fsrs));
+        assert_eq!(api.rating_scale, Some(RatingScale::TwoPoint));
+        assert_eq!(api.fuzzy_threshold, Some(0.95));
+    }
+
+    // === EffectiveSettings tests ===
+
+    #[test]
+    fn test_effective_settings_merge_no_deck() {
+        let global = DbGlobalSettings::default_for_device(Uuid::new_v4());
+        let effective = EffectiveSettings::merge(&global, None);
+
+        assert_eq!(effective.algorithm, global.algorithm);
+        assert_eq!(effective.rating_scale, global.rating_scale);
+        assert_eq!(effective.new_cards_per_day, global.new_cards_per_day);
+    }
+
+    #[test]
+    fn test_effective_settings_merge_with_deck_overrides() {
+        let global = DbGlobalSettings::default_for_device(Uuid::new_v4());
+        let deck = DbDeckSettings {
+            id: Uuid::new_v4(),
+            device_id: Uuid::new_v4(),
+            deck_path: "test".to_string(),
+            algorithm: Some("fsrs".to_string()),
+            rating_scale: None,
+            matching_mode: Some("exact".to_string()),
+            fuzzy_threshold: Some(0.99),
+            new_cards_per_day: Some(5),
+            reviews_per_day: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let effective = EffectiveSettings::merge(&global, Some(&deck));
+
+        assert_eq!(effective.algorithm, "fsrs");
+        assert_eq!(effective.rating_scale, "4point"); // From global
+        assert_eq!(effective.matching_mode, "exact");
+        assert_eq!(effective.fuzzy_threshold, 0.99);
+        assert_eq!(effective.new_cards_per_day, 5);
+        assert_eq!(effective.reviews_per_day, 200); // From global
+    }
+
+    #[test]
+    fn test_effective_settings_daily_reset_always_from_global() {
+        let mut global = DbGlobalSettings::default_for_device(Uuid::new_v4());
+        global.daily_reset_hour = 6;
+
+        let deck = DbDeckSettings {
+            id: Uuid::new_v4(),
+            device_id: Uuid::new_v4(),
+            deck_path: "test".to_string(),
+            algorithm: Some("sm2".to_string()),
+            rating_scale: None,
+            matching_mode: None,
+            fuzzy_threshold: None,
+            new_cards_per_day: None,
+            reviews_per_day: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let effective = EffectiveSettings::merge(&global, Some(&deck));
+        assert_eq!(effective.daily_reset_hour, 6);
+    }
+}

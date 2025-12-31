@@ -4,6 +4,7 @@
     "composite": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "baseUrl": ".",
+    "types": ["vitest/globals", "@testing-library/jest-dom"],
     "paths": {
       "@/*": ["src/*"],
       "@jirehs-flashcards/shared-types": ["../../libs/shared-types/src/index.ts"]
