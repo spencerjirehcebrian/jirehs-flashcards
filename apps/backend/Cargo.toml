@@ -1,0 +1,26 @@
+[package]
+name = "jirehs-flashcards-backend"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+flashcard-core = { path = "../../libs/flashcard-core" }
+axum = "0.7"
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "uuid", "migrate"] }
+aws-config = "1"
+aws-sdk-s3 = "1"
+dotenvy = "0.15"
+sha2 = "0.10"

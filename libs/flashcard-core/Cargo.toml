@@ -1,0 +1,14 @@
+[package]
+name = "flashcard-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+pretty_assertions = "1.4"
